@@ -12,10 +12,6 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.LocationManager">
-        <activity
-            android:name=".CustomeActivity"
-            android:exported="false" />
-
         <service
             android:name=".service.LocationService"
             android:enabled="true"
