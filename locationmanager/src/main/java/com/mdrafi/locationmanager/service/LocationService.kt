@@ -33,8 +33,6 @@ class LocationService : Service() {
     companion object {
         //region data
         val TAG: String = LocationServices::class.java.simpleName
-        private const val UPDATE_INTERVAL_IN_MILLISECONDS: Long = 2000
-
         val instance: LocationService
             get() = LocationService()
         private var mBackgroundLocationList: ArrayList<LocationUpdate> = ArrayList()
@@ -70,13 +68,14 @@ class LocationService : Service() {
             val intent = Intent(ACTION_BROADCAST)
             intent.putExtra(EXTRA_LOCATION, mLocation)
             LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(intent)
-            updateNotificationContent()
+//            updateNotificationContent()
             Log.d(
                 TAG,
                 currentLocation?.latitude.toString() + "," + currentLocation?.longitude
             )
         }
     }
+
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
@@ -85,9 +84,11 @@ class LocationService : Service() {
             }
             LocationType.Continuously.name -> {
                 mCustomNotification = intent.getParcelableExtra(IntentKeys.NOTIFICATION)
+                val interval = intent.getLongExtra(IntentKeys.INTERVAL_TIME, 2000)
+                val smallDisplacement = intent.getFloatExtra(IntentKeys.DISPLACEMENT, 0f)
                 lastLocation
                 prepareForegroundNotification()
-                startLocationUpdates()
+                startLocationUpdates(interval, smallDisplacement)
             }
             ACTION_STOP_FOREGROUND_SERVICE -> {
                 removeLocationUpdates()
@@ -96,7 +97,10 @@ class LocationService : Service() {
         return START_STICKY
     }
 
-    private fun startLocationUpdates() {
+    /*
+    * This method request For location updates
+    * */
+    private fun startLocationUpdates(interval: Long?, smallDisplacement: Float?) {
         if (ActivityCompat.checkSelfPermission(
                 this,
                 Manifest.permission.ACCESS_FINE_LOCATION
@@ -107,6 +111,8 @@ class LocationService : Service() {
         ) {
             throw Exception("Missing Location Permission")
         }
+        locationRequest?.interval = interval ?: 2000L
+        locationRequest?.smallestDisplacement = smallDisplacement ?: 0f
         locationRequest?.let {
             mFusedLocationClient?.requestLocationUpdates(
                 it,
@@ -115,6 +121,9 @@ class LocationService : Service() {
         }
     }
 
+    /*
+    * Create Notification
+    * */
     private fun prepareForegroundNotification() {
         if (mCustomNotification != null) {
             mCustomNotification?.notification?.let {
@@ -143,12 +152,15 @@ class LocationService : Service() {
 
     private fun initData() {
         locationRequest = LocationRequest.create()
-        locationRequest?.interval = UPDATE_INTERVAL_IN_MILLISECONDS
         locationRequest?.priority = Priority.PRIORITY_HIGH_ACCURACY
         mFusedLocationClient =
             LocationServices.getFusedLocationProviderClient(applicationContext)
     }
 
+    /*
+    * Gives last location
+    * Used for getting one time location
+    * */
     private val lastLocation: Unit
         get() {
             if (ActivityCompat.checkSelfPermission(
@@ -181,13 +193,15 @@ class LocationService : Service() {
                     val intent = Intent(ACTION_BROADCAST)
                     intent.putExtra(EXTRA_LOCATION, mLocation)
                     LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(intent)
-//                    updateNotificationContent()
                 } else {
                     Log.d(TAG, "Failed to get location.")
                 }
             }
         }
 
+    /*
+    * This method Update Notification content
+    * */
     fun updateNotificationContent() {
         Log.d(TAG, "updateNotificationContent() called")
         // Update notification content if running as a foreground service.
@@ -217,6 +231,9 @@ class LocationService : Service() {
         }
     }
 
+    /*
+    * This method gives the default notification if you are didn't set custom notification
+    * */
     private fun getNotification(): Notification {
 
         val pm = packageManager
@@ -248,6 +265,9 @@ class LocationService : Service() {
         return builder.build()
     }
 
+    /*
+    * This method gives location points when your app is in background or killed
+    * */
     fun getBackgroundLocationUpdateList(): ArrayList<LocationUpdate> {
         val list = ArrayList<LocationUpdate>()
         list.addAll(mBackgroundLocationList)

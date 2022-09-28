@@ -31,7 +31,9 @@ class LocationUpdateManager(
     private val context: Context?,
     private val fetchLocationType: LocationType?,
     private val customNotification: CustomNotification?,
-    val setOnLocationChangeListener: (LocationUpdate?) -> Unit = {}
+    val setOnLocationChangeListener: (LocationUpdate?) -> Unit = {},
+    private val locationUpdateInterval: Long?,
+    private val smallDisplacement: Float?
 ) : PermissionRequest.Listener {
 
     companion object {
@@ -67,7 +69,9 @@ class LocationUpdateManager(
         private var activity: Activity?,
         private var fetchLocationType: LocationType? = null,
         private var setOnLocationChangeListener: (LocationUpdate?) -> Unit = {},
-        private var customNotification: CustomNotification? = null
+        private var customNotification: CustomNotification? = null,
+        private var locationUpdateInterval: Long? = null,
+        private var smallDisplacement: Float? = null
     ) {
 
         fun build() =
@@ -75,7 +79,9 @@ class LocationUpdateManager(
                 activity,
                 fetchLocationType,
                 customNotification,
-                setOnLocationChangeListener
+                setOnLocationChangeListener,
+                locationUpdateInterval,
+                smallDisplacement
             )
     }
 
@@ -97,29 +103,28 @@ class LocationUpdateManager(
     * */
     private fun startService() {
         if (fetchLocationType == LocationType.OneTime) {
-            context?.startService(
-                Intent(
-                    context,
-                    LocationService::class.java
-                ).setAction(LocationType.OneTime.name)
-            )
+            Intent(context, LocationService::class.java)
+                .setAction(LocationType.OneTime.name)
+                .apply {
+                    context?.startService(this)
+                }
+
         } else {
+            val intent = Intent(context, LocationService::class.java)
+                .setAction(LocationType.Continuously.name)
+                .putExtra(IntentKeys.NOTIFICATION, customNotification)
+                .putExtra(IntentKeys.INTERVAL_TIME, locationUpdateInterval)
+                .putExtra(IntentKeys.DISPLACEMENT, smallDisplacement)
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context?.startForegroundService(
-                    Intent(
-                        context,
-                        LocationService::class.java
-                    ).setAction(LocationType.Continuously.name)
-                        .putExtra(IntentKeys.NOTIFICATION, customNotification)
-                )
+                intent.apply {
+                    context?.startForegroundService(this)
+                }
+
             } else {
-                context?.startService(
-                    Intent(
-                        context,
-                        LocationService::class.java
-                    ).setAction(LocationType.Continuously.name)
-                        .putExtra(IntentKeys.NOTIFICATION, customNotification)
-                )
+                intent.apply {
+                    context?.startService(this)
+                }
             }
         }
     }

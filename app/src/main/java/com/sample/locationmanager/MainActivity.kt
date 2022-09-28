@@ -45,6 +45,7 @@ class MainActivity : AppCompatActivity() {
                 activity = this,
                 fetchLocationType = LocationType.Continuously,
                 customNotification = createCustomNotification(),
+                locationUpdateInterval = 2000,
                 setOnLocationChangeListener = {
                     it?.let {
                         binding.latLongTv.text =
