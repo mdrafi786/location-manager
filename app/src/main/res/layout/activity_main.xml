@@ -10,16 +10,7 @@
         android:gravity="center"
         android:orientation="vertical">
 
-        <androidx.appcompat.widget.AppCompatTextView
-            android:id="@+id/fromNotification"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:lineSpacingExtra="20dp"
-            android:text="@string/from_notification"
-            android:textColor="@color/white"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+
 
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/request_location_updates_button"
@@ -39,14 +30,7 @@
             android:text="@string/remove_location_updates"
             android:textAllCaps="false" />
 
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/show_background_points_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:backgroundTint="@android:color/holo_blue_bright"
-            android:text="@string/show_background_points"
-            android:textAllCaps="false" />
+
 
         <androidx.appcompat.widget.AppCompatTextView
             android:id="@+id/latLongTv"

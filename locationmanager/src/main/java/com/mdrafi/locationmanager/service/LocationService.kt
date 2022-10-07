@@ -1,276 +1,86 @@
 package com.mdrafi.locationmanager.service
 
-import android.Manifest
-import android.app.*
+import android.app.NotificationManager
+import android.app.Service
+import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.graphics.drawable.BitmapDrawable
-import android.graphics.drawable.Drawable
 import android.location.Location
-import android.os.Build
 import android.os.IBinder
-import android.os.Looper
-import android.util.Log
-import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
-import androidx.core.graphics.drawable.IconCompat
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import com.google.android.gms.location.*
-import com.mdrafi.locationmanager.constants.*
-import com.mdrafi.locationmanager.manager.LocationUpdateManager
-import com.mdrafi.locationmanager.model.CustomNotification
-import com.mdrafi.locationmanager.model.LocationUpdate
-
+import androidx.lifecycle.MutableLiveData
+import com.google.android.gms.location.LocationServices
+import com.mdrafi.locationmanager.R
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.*
 
 class LocationService : Service() {
-    private var mFusedLocationClient: FusedLocationProviderClient? = null
-    private var locationRequest: LocationRequest? = null
-    private var mLocation: LocationUpdate? = null
-    private var mNotificationManager: NotificationManager? = null
-    private var mCustomNotification: CustomNotification? = null
 
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private lateinit var locationClient: LocationClient
 
     companion object {
-        //region data
-        val TAG: String = LocationServices::class.java.simpleName
-        val instance: LocationService
-            get() = LocationService()
-        private var mBackgroundLocationList: ArrayList<LocationUpdate> = ArrayList()
+        const val ACTION_START = "ACTION_START"
+        const val ACTION_STOP = "ACTION_STOP"
+
+        var locationResult: MutableLiveData<Location> = MutableLiveData()
     }
 
-    //onCreate
-    override fun onCreate() {
-        super.onCreate()
-        Log.d("CustomTag", "OnCreate() fo Service")
-        mBackgroundLocationList.clear()
-        initData()
-    }
-
-    //Location Callback
-    private val locationCallback: LocationCallback = object : LocationCallback() {
-        override fun onLocationResult(locationResult: LocationResult) {
-            super.onLocationResult(locationResult)
-            val currentLocation: Location? = locationResult.lastLocation
-            if (currentLocation == null) {
-                Log.d(
-                    TAG,
-                    "Current Location is null"
-                )
-            }
-            mLocation = LocationUpdate(System.currentTimeMillis().toString(), currentLocation)
-            // Notify anyone listening for broadcasts about the new location.
-            Log.d("MyTag", "Service is in background : ${LocationUpdateManager.isBackground}")
-            if (LocationUpdateManager.isBackground) {
-                mLocation?.let {
-                    mBackgroundLocationList.add(it)
-                }
-            }
-            val intent = Intent(ACTION_BROADCAST)
-            intent.putExtra(EXTRA_LOCATION, mLocation)
-            LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(intent)
-//            updateNotificationContent()
-            Log.d(
-                TAG,
-                currentLocation?.latitude.toString() + "," + currentLocation?.longitude
-            )
-        }
-    }
-
-
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            LocationType.OneTime.name -> {
-                lastLocation
-            }
-            LocationType.Continuously.name -> {
-                mCustomNotification = intent.getParcelableExtra(IntentKeys.NOTIFICATION)
-                val interval = intent.getLongExtra(IntentKeys.INTERVAL_TIME, 2000)
-                val smallDisplacement = intent.getFloatExtra(IntentKeys.DISPLACEMENT, 0f)
-                lastLocation
-                prepareForegroundNotification()
-                startLocationUpdates(interval, smallDisplacement)
-            }
-            ACTION_STOP_FOREGROUND_SERVICE -> {
-                removeLocationUpdates()
-            }
-        }
-        return START_STICKY
-    }
-
-    /*
-    * This method request For location updates
-    * */
-    private fun startLocationUpdates(interval: Long?, smallDisplacement: Float?) {
-        if (ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            throw Exception("Missing Location Permission")
-        }
-        locationRequest?.interval = interval ?: 2000L
-        locationRequest?.smallestDisplacement = smallDisplacement ?: 0f
-        locationRequest?.let {
-            mFusedLocationClient?.requestLocationUpdates(
-                it,
-                locationCallback, Looper.getMainLooper()
-            )
-        }
-    }
-
-    /*
-    * Create Notification
-    * */
-    private fun prepareForegroundNotification() {
-        if (mCustomNotification != null) {
-            mCustomNotification?.notification?.let {
-                startForeground(
-                    LocationUpdateManager.NOTIFICATION_ID,
-                    it
-                )
-            }
-        } else {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val serviceChannel = NotificationChannel(
-                    CHANNEL_ID,
-                    "Location Service Channel",
-                    NotificationManager.IMPORTANCE_DEFAULT
-                )
-                mNotificationManager = getSystemService(NotificationManager::class.java)
-                mNotificationManager?.createNotificationChannel(serviceChannel)
-            }
-            startForeground(LocationUpdateManager.NOTIFICATION_ID, getNotification())
-        }
-    }
-
-    override fun onBind(intent: Intent?): IBinder? {
+    override fun onBind(p0: Intent?): IBinder? {
         return null
     }
 
-    private fun initData() {
-        locationRequest = LocationRequest.create()
-        locationRequest?.priority = Priority.PRIORITY_HIGH_ACCURACY
-        mFusedLocationClient =
+    override fun onCreate() {
+        super.onCreate()
+        locationClient = DefaultLocationClient(
+            applicationContext,
             LocationServices.getFusedLocationProviderClient(applicationContext)
-    }
-
-    /*
-    * Gives last location
-    * Used for getting one time location
-    * */
-    private val lastLocation: Unit
-        get() {
-            if (ActivityCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.ACCESS_FINE_LOCATION
-                ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                throw Exception("Missing Location Permission")
-            }
-
-            mFusedLocationClient?.lastLocation?.addOnCompleteListener { task ->
-                Log.d(TAG, "addOnCompleteListener called")
-                if (task.isSuccessful && task.result != null) {
-                    val currentLocation = task.result
-                    if (currentLocation == null) {
-                        Log.d(
-                            TAG,
-                            "Current Location is null"
-                        )
-                    }
-                    Log.d(
-                        TAG,
-                        currentLocation?.latitude.toString() + "," + currentLocation?.longitude
-                    )
-                    mLocation =
-                        LocationUpdate(System.currentTimeMillis().toString(), currentLocation)
-                    val intent = Intent(ACTION_BROADCAST)
-                    intent.putExtra(EXTRA_LOCATION, mLocation)
-                    LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(intent)
-                } else {
-                    Log.d(TAG, "Failed to get location.")
-                }
-            }
-        }
-
-    /*
-    * This method Update Notification content
-    * */
-    fun updateNotificationContent() {
-        Log.d(TAG, "updateNotificationContent() called")
-        // Update notification content if running as a foreground service.
-        mCustomNotification?.let {
-            it.notificationManager?.notify(LocationUpdateManager.NOTIFICATION_ID, it.notification)
-        } ?: run {
-            mNotificationManager?.notify(
-                LocationUpdateManager.NOTIFICATION_ID,
-                getNotification()
-            )
-        }
-    }
-
-    /**
-     * Removes location updates. Note that in this sample we merely log the
-     * [SecurityException].
-     */
-    private fun removeLocationUpdates() {
-        Log.i(TAG, "Removing location updates")
-        try {
-            mBackgroundLocationList.clear()
-            mFusedLocationClient?.removeLocationUpdates(locationCallback)
-            stopForeground(true)
-            stopSelf()
-        } catch (unlikely: SecurityException) {
-            throw  Exception("Lost location permission. Could not remove updates. $unlikely")
-        }
-    }
-
-    /*
-    * This method gives the default notification if you are didn't set custom notification
-    * */
-    private fun getNotification(): Notification {
-
-        val pm = packageManager
-        val notificationIntent = pm.getLaunchIntentForPackage(applicationContext.packageName)
-        notificationIntent?.putExtra(EXTRA_STARTED_FROM_NOTIFICATION, true)
-        var icon: Drawable? = null
-        try {
-            icon = pm.getApplicationIcon(applicationContext.packageName)
-        } catch (e: PackageManager.NameNotFoundException) {
-            e.printStackTrace()
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            123,
-            notificationIntent, 0
         )
-        val builder = NotificationCompat.Builder(this)
-            .setContentText("Location Service is running")
-            .setSmallIcon(IconCompat.createWithBitmap((icon as BitmapDrawable).bitmap))
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setContentIntent(pendingIntent)
-            .setWhen(System.currentTimeMillis())
-
-
-        // Set the Channel ID for Android O.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            builder.setChannelId(CHANNEL_ID) // Channel ID
-        }
-        return builder.build()
     }
 
-    /*
-    * This method gives location points when your app is in background or killed
-    * */
-    fun getBackgroundLocationUpdateList(): ArrayList<LocationUpdate> {
-        val list = ArrayList<LocationUpdate>()
-        list.addAll(mBackgroundLocationList)
-        return list
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_START -> start()
+            ACTION_STOP -> stop()
+        }
+        return super.onStartCommand(intent, flags, startId)
+    }
+
+    private fun start() {
+        val notification = NotificationCompat.Builder(this, "location")
+            .setContentTitle("Tracking location...")
+            .setContentText("Location: null")
+            .setSmallIcon(R.drawable.ic_launcher_background)
+            .setOngoing(true)
+
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        locationClient
+            .getLocationUpdates(10000L)
+            .catch { e -> e.printStackTrace() }
+            .onEach { location ->
+                val lat = location.latitude.toString().takeLast(3)
+                val long = location.longitude.toString().takeLast(3)
+                val updatedNotification = notification.setContentText(
+                    "Location: ($lat, $long)"
+                )
+                locationResult.postValue(location)
+                notificationManager.notify(1, updatedNotification.build())
+            }
+            .launchIn(serviceScope)
+
+        startForeground(1, notification.build())
+    }
+
+    private fun stop() {
+        stopForeground(true)
+        stopSelf()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        serviceScope.cancel()
     }
 }
