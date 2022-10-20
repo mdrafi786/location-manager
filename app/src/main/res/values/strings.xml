@@ -17,4 +17,5 @@
     <string name="lat_long">Lat : %1$s\nLong : %2$s</string>
     <string name="from_notification">Come from Notification : %1$s</string>
     <string name="no_points">No points found</string>
+    <string name="get_current_location">Get Current Location</string>
 </resources>

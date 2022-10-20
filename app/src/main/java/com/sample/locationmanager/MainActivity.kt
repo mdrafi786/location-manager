@@ -42,6 +42,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setClickListener() {
+        binding.getCurrentLocationBt.setOnClickListener {
+            Intent(applicationContext, LocationService::class.java).apply {
+                action = LocationService.ACTION_ONE_TIME
+                startService(this)
+            }
+        }
         binding.requestLocationUpdatesButton.setOnClickListener {
             Intent(applicationContext, LocationService::class.java).apply {
                 action = LocationService.ACTION_START

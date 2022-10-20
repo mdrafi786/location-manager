@@ -11,6 +11,15 @@
         android:orientation="vertical">
 
 
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/getCurrentLocationBt"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:backgroundTint="@android:color/holo_green_dark"
+            android:text="@string/get_current_location"
+            android:textAllCaps="false" />
+
 
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/request_location_updates_button"
@@ -29,7 +38,6 @@
             android:backgroundTint="@android:color/holo_red_light"
             android:text="@string/remove_location_updates"
             android:textAllCaps="false" />
-
 
 
         <androidx.appcompat.widget.AppCompatTextView
