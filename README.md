@@ -1,6 +1,6 @@
 # **Location Manager**
 
-Location Manager is a library that helps to easily fetch location when your app is in forground, background or in killed state.
+Location Manager is a library that helps to easily fetch location when your app is in foreground, background or in killed state.
 
 ## Features
 
