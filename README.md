@@ -69,6 +69,3 @@ Location Manager is a library that helps to easily fetch location when your app 
   ```
   
  > **Note : You only need to `stop service` if you start service to get location update `continuously`.**
-
-## License
-* [BigOhNotation](https://www.bigohtech.com/)
