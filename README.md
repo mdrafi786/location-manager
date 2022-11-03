@@ -67,6 +67,17 @@ Location Manager is a library that helps to easily fetch location when your app 
                 startService(this)
             }
   ```
+* Get `Latitude` and `Longitude` in your activity and fragment by `LiveData` :  
+  ```kotlin
+     LocationService.locationResult.observe(this) {
+            binding.latLongTv.text =
+                String.format(
+                    getString(R.string.lat_long),
+                    it.latitude,
+                    it.longitude
+                )
+        }
+  ```
   
  > **Note : You only need to `stop service` if you start service to get location update `continuously`.**
 
